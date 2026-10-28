@@ -26,18 +26,23 @@ type User struct {
 	ID      string
 	Name    string
 	Balance float64
+	mu      sync.Mutex
 }
 
 func (u *User) Deposit(deposit float64) {
+	u.mu.Lock()
 	u.Balance = u.Balance + deposit
+	u.mu.Unlock()
 }
 
 func (u *User) Withdraw(withdraw float64) error {
+	u.mu.Lock()
 	if remainder := u.Balance - withdraw; remainder < 0 {
 		return errNotEnoughFunds
 	} else {
 		u.Balance = remainder
 	}
+	u.mu.Unlock()
 	return nil
 }
 
