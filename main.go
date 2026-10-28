@@ -31,8 +31,8 @@ type User struct {
 
 func (u *User) Deposit(deposit float64) {
 	u.mu.Lock()
+	defer u.mu.Unlock()
 	u.Balance = u.Balance + deposit
-	u.mu.Unlock()
 }
 
 func (u *User) Withdraw(withdraw float64) error {
@@ -42,7 +42,6 @@ func (u *User) Withdraw(withdraw float64) error {
 	} else {
 		u.Balance = remainder
 	}
-	u.mu.Unlock()
 	return nil
 }
 
