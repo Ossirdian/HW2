@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"sync"
 )
 
 var (
@@ -48,34 +49,38 @@ func (ps *PaymentSystem) AddTransaction(tc Transaction) {
 	ps.TransactionQueue = append(ps.TransactionQueue, tc)
 }
 
-func (ps *PaymentSystem) ProcessingTransactions() error {
-	if len(ps.TransactionQueue) == 0 {
-		return errTransactionsQueueEmpty
-	}
-	transaction := ps.TransactionQueue[0]
-	ps.TransactionQueue = ps.TransactionQueue[1:]
-	snd, ok := ps.Users[transaction.FromID]
+func (ps *PaymentSystem) ProcessingTransactions(t Transaction) error {
+	snd, ok := ps.Users[t.FromID]
 	if !ok {
-		return fmt.Errorf("User with ID %v not found", transaction.FromID)
+		return fmt.Errorf("User with ID %v not found", t.FromID)
 	}
-	rcv, ok := ps.Users[transaction.ToID]
+	rcv, ok := ps.Users[t.ToID]
 	if !ok {
-		return fmt.Errorf("User with ID %v not found", transaction.ToID)
+		return fmt.Errorf("User with ID %v not found", t.ToID)
 	}
-	if err := snd.Withdraw(transaction.Amount); err != nil {
+	if err := snd.Withdraw(t.Amount); err != nil {
 		return err
 	}
-	rcv.Deposit(transaction.Amount)
+	rcv.Deposit(t.Amount)
 	return nil
 }
+
+func (ps *PaymentSystem) Worker(ch <-chan Transaction, wg *sync.WaitGroup) {
+	wg.Go(func() {
+		for t := range ch {
+			if err := ps.ProcessingTransactions(t); err != nil {
+				fmt.Println(err)
+			}
+		}
+	})
+}
+
 func main() {
-	// TODO: Инициализируем структуру PaymentSystem через указатель, чтобы работать с ней напрямую и сохранять изменения
 	paymentSys := &PaymentSystem{
 		Users:            make(map[string]*User),
 		TransactionQueue: make([]Transaction, 0),
 	}
 
-	// Подсказка
 	usr1 := &User{
 		ID:      "1",
 		Name:    "User1",
@@ -89,11 +94,9 @@ func main() {
 	}
 	fmt.Println("Создаю UserID: 2 с балансом 500")
 
-	// TODO: Добавить пользователей через AddUser
 	paymentSys.AddUser(usr1)
 	paymentSys.AddUser(usr2)
 
-	// Подсказка
 	trc1 := Transaction{
 		FromID: "1",
 		ToID:   "2",
@@ -107,18 +110,24 @@ func main() {
 	fmt.Println("Перевожу с UserID: 1 на UserID: 2 сумму в размере 200")
 	fmt.Println("Перевожу с UserID: 2 на UserID: 1 сумму в размере 50")
 
-	// TODO: Добавляем транзакции
 	paymentSys.AddTransaction(trc1)
 	paymentSys.AddTransaction(trc2)
 
-	// TODO: Обрабатываем транзакции по очереди
-	for range len(paymentSys.TransactionQueue) {
-		if err := paymentSys.ProcessingTransactions(); err != nil {
-			fmt.Println(err)
-		}
+	// TODO: Создать канал ch := ...
+	ch := make(chan Transaction, len(paymentSys.TransactionQueue))
+	// TODO: Инициализируем sync.WaitGroup
+	wg := &sync.WaitGroup{}
+
+	for range 3 {
+		paymentSys.Worker(ch, wg)
 	}
 
-	// Подсказка
+	for _, t := range paymentSys.TransactionQueue {
+		ch <- t
+	}
+	close(ch)
+	wg.Wait()
+
 	fmt.Println("Result")
 	fmt.Printf("User1 balance is %v\n", usr1.Balance)
 	fmt.Printf("User2 balance is %v\n", usr2.Balance)
