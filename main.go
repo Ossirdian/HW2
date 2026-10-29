@@ -119,7 +119,7 @@ func main() {
 
 	for range 3 {
 		wg.Add(1)
-		paymentSys.Worker(ch, wg)
+		go paymentSys.Worker(ch, wg)
 	}
 
 	for _, t := range paymentSys.TransactionQueue {
