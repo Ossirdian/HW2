@@ -66,13 +66,12 @@ func (ps *PaymentSystem) ProcessingTransactions(t Transaction) error {
 }
 
 func (ps *PaymentSystem) Worker(ch <-chan Transaction, wg *sync.WaitGroup) {
-	wg.Go(func() {
-		for t := range ch {
-			if err := ps.ProcessingTransactions(t); err != nil {
-				fmt.Println(err)
-			}
+	defer wg.Done()
+	for t := range ch {
+		if err := ps.ProcessingTransactions(t); err != nil {
+			fmt.Println(err)
 		}
-	})
+	}
 }
 
 func main() {
@@ -119,6 +118,7 @@ func main() {
 	wg := &sync.WaitGroup{}
 
 	for range 3 {
+		wg.Add(1)
 		paymentSys.Worker(ch, wg)
 	}
 
